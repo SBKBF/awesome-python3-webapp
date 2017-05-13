@@ -2,7 +2,7 @@
 Configuration
 '''
 
-import www.config_default
+import www.config_default as config_default
 
 class Dict(dict):
     '''
