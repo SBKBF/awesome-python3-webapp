@@ -19,3 +19,9 @@ def index(request):
         '__template__': 'blogs.html',
         'blogs': blogs
     }
+
+@get('/try')
+def try1(request):
+    return {
+        '__template__': 'try.html',
+    }

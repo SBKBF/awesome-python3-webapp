@@ -1,6 +1,7 @@
 '''
 Default configurations.
 '''
+#默认的配置文件应该完全符合本地开发环境，这样，无需任何设置，就可以立刻启动服务器。
 
 configs = {
     'debug': True,

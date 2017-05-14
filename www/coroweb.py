@@ -6,6 +6,8 @@ from aiohttp import web
 
 from www.apis import APIError
 
+#要把一个函数映射为一个URL处理函数，我们先定义@get()
+#这样，一个函数通过@get()的装饰就附带了URL信息
 def get(path):
     '''
     Define decorator @get('/path')
@@ -72,6 +74,8 @@ def has_request_arg(fn):
             raise ValueError('request parameter must be the last named parameter in function: %s%s' % (fn.__name__, str(sig)))
     return found
 
+# RequestHandler目的就是从URL函数中分析其需要接收的参数，
+# 从request中获取必要的参数，调用URL函数，然后把结果转换为web.Response对象，
 class RequestHandler(object):
 
     def __init__(self, app, fn):
@@ -83,7 +87,8 @@ class RequestHandler(object):
         self._named_kw_args = get_named_kw_args(fn)
         self._required_kw_args = get_required_kw_args(fn)
 
-    async def __call__(self, request):
+    @asyncio.coroutine
+    def __call__(self, request):
         kw = None
         if self._has_var_kw_arg or self._has_named_kw_args or self._required_kw_args:
             if request.method == 'POST':
@@ -91,12 +96,12 @@ class RequestHandler(object):
                     return web.HTTPBadRequest('Missing Content-Type.')
                 ct = request.content_type.lower()
                 if ct.startswith('application/json'):
-                    params = await request.json()
+                    params = yield from request.json()
                     if not isinstance(params, dict):
                         return web.HTTPBadRequest('JSON body must be object.')
                     kw = params
                 elif ct.startswith('application/x-www-form-urlencoded') or ct.startswith('multipart/form-data'):
-                    params = await request.post()
+                    params = yield from request.post()
                     kw = dict(**params)
                 else:
                     return web.HTTPBadRequest('Unsupported Content-Type: %s' % request.content_type)
@@ -130,7 +135,7 @@ class RequestHandler(object):
                     return web.HTTPBadRequest('Missing argument: %s' % name)
         logging.info('call with args: %s' % str(kw))
         try:
-            r = await self._func(**kw)
+            r = yield from self._func(**kw)
             return r
         except APIError as e:
             return dict(error=e.error, data=e.data, message=e.message)
@@ -149,6 +154,17 @@ def add_route(app, fn):
         fn = asyncio.coroutine(fn)
     logging.info('add route %s %s => %s(%s)' % (method, path, fn.__name__, ', '.join(inspect.signature(fn).parameters.keys())))
     app.router.add_route(method, path, RequestHandler(app, fn))
+
+# 最后一步，把很多次add_route()注册的调用：
+#
+# add_route(app, handles.index)
+# add_route(app, handles.blog)
+# add_route(app, handles.create_comment)
+# ...
+# 变成自动扫描：
+#
+# # 自动把handler模块的所有符合条件的函数注册了:
+# add_routes(app, 'handlers')
 
 def add_routes(app, module_name):
     n = module_name.rfind('.')
